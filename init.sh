@@ -4,19 +4,32 @@ $CRI_VERSION = 1.3.4
 
 # Perform initial updates and install pre-requisites
 # do-release-upgrade
-sudo apt-get update && sudo apt-get install -y apt-transport-https curl zip
+sudo apt-get update && sudo apt-get install -y apt-transport-https curl zip gnupg-agent software-properties-common
 
+# Disable swap and remove swap file as the kubelet will fail if swap
+# is on
+sudo rm -f /etc/fstab
+sudo swapoff -a
 
 # Allow iptables see bridged network
 cat <<EOF | sudo tee /etc/sysctl.d/k8s.conf
-net.bridge.bridge-nf-call-ip6tables = 1
-net.bridge.bridge-nf-call-iptables = 1
+net.bridge.bridge-nf-call-ip6tables   = 1
+net.bridge.bridge-nf-call-iptables    = 1
+net.ipv4.ip_forward                   = 1
 EOF
 sudo sysctl --system
 
-sudo modprobe br_netfilter
-
 # TODO: Write command to check kubernetes required ports
+
+# Install docker
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+sudo apt-key fingerprint 0EBFCD88
+sudo add-apt-repository \
+   "deb [arch=amd64] https://download.docker.com/linux/ubuntu \
+   $(lsb_release -cs) \
+   stable"
+sudo apt-get update
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io
 
 # Install container runtime and configure
 wget https://github.com/containerd/containerd/releases/download/v$CRI_VERSION/containerd-${CRI_VERSION}.linux-amd64.tar.gz
@@ -25,6 +38,14 @@ tar -xvf containerd-$CRI_VERSION.linux-amd64.tar.gz -C containerd
 sudo mv containerd/bin/* /bin
 
 sudo mkdir -p /etc/containerd
+
+cat <<EOF | sudo tee /etc/modules-load.d/containerd.conf
+overlay
+br_netfilter 
+EOF
+
+sudo modprobe overlay
+sudo modprobe br_netfilter
 
 cat << EOF | sudo tee /etc/containerd/config.toml
 [plugins]
@@ -61,7 +82,6 @@ EOF
 sudo systemctl daemon-reload
 sudo systemctl enable containerd
 sudo systemctl start containerd
-
 
 # Install and configure kubeadm, kubelet and kubectl on nodes
 curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
