@@ -4,9 +4,6 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
-
-$CRI_VERSION = 1.3.4
-
 # Perform initial updates and install pre-requisites
 # do-release-upgrade
 sudo apt-get update && sudo apt-get install -y apt-transport-https curl zip gnupg-agent software-properties-common
