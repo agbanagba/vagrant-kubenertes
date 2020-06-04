@@ -1,8 +1,14 @@
 #!/bin/bash
 
+set -o errexit
+set -o pipefail
+set -o nounset
+
 # pull control plane initialization images and create cluster
 sudo kubeadm config images pull
-sudo kubeadm init --apiserver-advertise-address=$ --apiserver-cert-extra-sans=$ --name master --pod-network-cidr=$
+NODENAME=$(hostname -s)
+sudo kubeadm init --apiserver-advertise-address=192.168.10.10 --apiserver-cert-extra-sans=192.168.10.10 \
+    --node-name master --pod-network-cidr=192.168.0.0/16 --cri-socket=/run/containerd/containerd.sock
 
 # Copy kubeconfig on control plane
 mkdir -p $HOME/.kube
